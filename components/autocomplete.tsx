@@ -1,32 +1,40 @@
 import {
   AutocompleteOptions,
   AutocompleteState,
-  createAutocomplete
+  createAutocomplete,
 } from "@algolia/autocomplete-core";
-import { getAlgoliaResults } from "@algolia/autocomplete-preset-algolia";
 import type { Hit } from "@algolia/client-search";
 import { ChevronRightIcon, SearchIcon, XIcon } from "@heroicons/react/outline";
+import {
+  getMeilisearchResults,
+  meilisearchAutocompleteClient,
+} from "@meilisearch/autocomplete-client";
 import algoliasearch from "algoliasearch/lite";
+import moment from "moment";
 import * as React from "react";
 
 import { classNames } from "../utils";
 
-const searchClient = algoliasearch(
-  "latency",
-  "6be0576ff61c053d5f9a3225e2a90f76"
-);
+const searchClient = meilisearchAutocompleteClient({
+  url: "https://sea.net.ixbt.com",
+  apiKey: "27be1c4a7971c797bd436dd71da6aff2bc84114162c629bf84eb05498c358f14",
+});
 
 type AutocompleteItem = Hit<{
-  brand: string;
-  categories: string[];
+  title: string;
+  subtitle: string;
+  lead: string;
+  slug: string;
+  date: string;
+  pubtype: string;
+  authors: string[];
+  root_categories: string[];
   image: string;
-  name: string;
-  objectID: string;
   url: string;
 }>;
 
 export function Autocomplete(
-  props: Partial<AutocompleteOptions<AutocompleteItem>>
+  props: Partial<AutocompleteOptions<AutocompleteItem>>,
 ): JSX.Element {
   const [autocompleteState, setAutocompleteState] = React.useState<
     AutocompleteState<AutocompleteItem>
@@ -37,7 +45,7 @@ export function Autocomplete(
     isOpen: false,
     query: "",
     activeItemId: null,
-    status: "idle"
+    status: "idle",
   });
 
   const autocomplete = React.useMemo(
@@ -54,32 +62,32 @@ export function Autocomplete(
         getSources() {
           return [
             {
-              sourceId: "products",
+              sourceId: "articles",
               getItems({ query }) {
-                return getAlgoliaResults({
+                return getMeilisearchResults({
                   searchClient,
                   queries: [
                     {
-                      indexName: "instant_search",
+                      indexName: "articles:pubdatetime:desc",
                       query,
                       params: {
                         hitsPerPage: 5,
                         highlightPreTag: "<mark>",
-                        highlightPostTag: "</mark>"
-                      }
-                    }
-                  ]
+                        highlightPostTag: "</mark>",
+                      },
+                    },
+                  ],
                 });
               },
               getItemUrl({ item }) {
                 return item.url;
-              }
-            }
+              },
+            },
           ];
         },
-        ...props
+        ...props,
       }),
-    [props]
+    [props],
   );
   const inputRef = React.useRef<HTMLInputElement>(null);
   const formRef = React.useRef<HTMLFormElement>(null);
@@ -94,7 +102,7 @@ export function Autocomplete(
     const { onTouchStart, onTouchMove } = getEnvironmentProps({
       formElement: formRef.current,
       inputElement: inputRef.current,
-      panelElement: panelRef.current
+      panelElement: panelRef.current,
     });
 
     addEventListener("touchstart", onTouchStart);
@@ -107,15 +115,16 @@ export function Autocomplete(
   }, [getEnvironmentProps, formRef, inputRef, panelRef]);
 
   const formProps = autocomplete.getFormProps({
-    inputElement: inputRef.current
+    inputElement: inputRef.current,
   });
   const labelProps = autocomplete.getLabelProps({});
   const inputProps = autocomplete.getInputProps({
     inputElement: inputRef.current,
-    placeholder: "Search"
+    placeholder: "Поиск",
   });
   const panelProps = autocomplete.getPanelProps({});
 
+  moment.locale("ru");
   return (
     <div className="relative" {...autocomplete.getRootProps({})}>
       <form ref={formRef} {...formProps}>
@@ -129,7 +138,7 @@ export function Autocomplete(
               title="Submit"
               className={classNames(
                 "rounded-md pointer-events-auto p-1 -ml-1",
-                "focus:outline-none focus:ring-2 focus:ring-teal-600"
+                "focus:outline-none focus:ring-2 focus:ring-teal-600",
               )}
             >
               <SearchIcon className="h-5 w-5" aria-hidden="true" />
@@ -153,7 +162,7 @@ export function Autocomplete(
             // Full bleed form up until `sm`
             "w-screen ml-[calc(50%-0.25rem)] transform -translate-x-1/2",
             // Reset full bleed for `sm` and above
-            "sm:w-[calc(100%+8rem)] sm:-ml-16 sm:translate-x-0"
+            "sm:w-[calc(100%+8rem)] sm:-ml-16 sm:translate-x-0",
           )}
           {...panelProps}
         >
@@ -169,10 +178,10 @@ export function Autocomplete(
                     {items.map((item, index) => {
                       const itemProps = autocomplete.getItemProps({
                         item,
-                        source
+                        source,
                       });
                       return (
-                        <li key={item.objectID} {...itemProps}>
+                        <li key={item.slug} {...itemProps}>
                           <a
                             href={item.url}
                             className={classNames(
@@ -182,7 +191,7 @@ export function Autocomplete(
                                 "bg-gray-50 outline-none ring-inset ring-2 ring-offset-2 ring-offset-teal-600 ring-white border-white",
                               "block border-2 border-transparent",
                               "hover:bg-gray-50",
-                              "focus:outline-none focus:ring-inset focus:ring-2 focus:ring-offset-2 focus:ring-offset-teal-600 focus:ring-white focus:border-white"
+                              "focus:outline-none focus:ring-inset focus:ring-2 focus:ring-offset-2 focus:ring-offset-teal-600 focus:ring-white focus:border-white",
                             )}
                           >
                             <div className="flex items-center px-4 py-4 sm:px-6">
@@ -192,18 +201,25 @@ export function Autocomplete(
                                   <img
                                     className="w-12 h-12 object-contain"
                                     src={item.image}
-                                    alt={item.name}
+                                    alt={item.title}
                                   />
                                 </div>
                                 <div className="flex-1 min-w-0 px-4">
                                   <div>
                                     <p className="text-sm font-medium text-teal-700 truncate">
-                                      {item.name}
+                                      {item.title}
                                     </p>
-                                    <div className="flex items-center mt-2 text-sm text-gray-500">
-                                      <p className="truncate">
-                                        By <strong>{item.brand}</strong> in{" "}
-                                        <strong>{item.categories[0]}</strong>
+                                    <p className="text-sm font-medium text-teal-700 truncate">
+                                      {item.subtitle}
+                                    </p>
+                                    <div className="flex flex-col items-start mt-2 text-sm text-gray-500">
+                                      <p className="truncate text-sm">
+                                        {item.date}
+                                      </p>
+                                      <p>
+                                        <strong>
+                                          {item.root_categories[0]}
+                                        </strong>
                                       </p>
                                     </div>
                                   </div>
